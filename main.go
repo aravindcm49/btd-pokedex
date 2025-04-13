@@ -18,9 +18,10 @@ type cliCommand struct {
 }
 
 type Config struct {
-	Next     string
-	Previous string
-	Cache    *pokecache.Cache
+	Next               string
+	Previous           string
+	AddtionalArguments string
+	Cache              *pokecache.Cache
 }
 
 var helpmap map[string]cliCommand
@@ -47,6 +48,11 @@ func init() {
 			description: "Go back in the pokemon locations",
 			callback:    commandMapb,
 		},
+		"explore": {
+			name:        "explore",
+			description: "explore and find pokemon in a location",
+			callback:    commandExplore,
+		},
 		"config": {
 			name:        "config",
 			description: "Print out the config",
@@ -70,6 +76,11 @@ func main() {
 		if !ok {
 			fmt.Println("Unknown command")
 		} else {
+			if len(cleanInput(textInput)) > 1 {
+				config.AddtionalArguments = strings.Join(cleanInput(textInput)[1:], " ")
+			} else {
+				config.AddtionalArguments = ""
+			}
 			res.callback(&config)
 		}
 		fmt.Printf("Pokedex > ") // Println will add back the final '\n'
@@ -208,4 +219,24 @@ func commandMapb(config *Config) error {
 func commandConfig(config *Config) error {
 	fmt.Printf("\nCONFIG\n------\nNext - %v\nPrevious - %v\n\n", config.Next, config.Previous)
 	return nil
+}
+
+func commandExplore(config *Config) error {
+	secondInput := config.AddtionalArguments
+	if secondInput == "" {
+		fmt.Printf("Please provide a pokemon name\n")
+		return nil
+	}
+	res, err := pokeapi.GetPokemonsForLA(secondInput)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Exploring %v...\n", secondInput)
+	fmt.Println("Found Pokemon:")
+	for _, pe := range res {
+		fmt.Printf("- %v\n", pe.Pokemon.Name)
+	}
+
+	return nil
+
 }
