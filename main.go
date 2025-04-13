@@ -21,6 +21,7 @@ type Config struct {
 	Next               string
 	Previous           string
 	AddtionalArguments string
+	Pokedex            map[string]pokeapi.Pokemon
 	Cache              *pokecache.Cache
 }
 
@@ -53,6 +54,16 @@ func init() {
 			description: "explore and find pokemon in a location",
 			callback:    commandExplore,
 		},
+		"catch": {
+			name:        "catch",
+			description: "try to catch a pokemon",
+			callback:    commandCatch,
+		},
+		"inspect": {
+			name:        "inspect",
+			description: "inspect a pokemon",
+			callback:    commandInspect,
+		},
 		"config": {
 			name:        "config",
 			description: "Print out the config",
@@ -64,7 +75,8 @@ func init() {
 func main() {
 	cache := pokecache.NewCache(5 * time.Minute)
 	config := Config{
-		Cache: cache,
+		Cache:   cache,
+		Pokedex: make(map[string]pokeapi.Pokemon),
 	}
 
 	scanner := bufio.NewScanner(os.Stdin)
@@ -218,13 +230,17 @@ func commandMapb(config *Config) error {
 
 func commandConfig(config *Config) error {
 	fmt.Printf("\nCONFIG\n------\nNext - %v\nPrevious - %v\n\n", config.Next, config.Previous)
+	fmt.Printf("Pokedex:\n")
+	for _, v := range config.Pokedex {
+		fmt.Printf("- %v\n", v.Name)
+	}
 	return nil
 }
 
 func commandExplore(config *Config) error {
 	secondInput := config.AddtionalArguments
 	if secondInput == "" {
-		fmt.Printf("Please provide a pokemon name\n")
+		fmt.Printf("Please provide a location name\n")
 		return nil
 	}
 	res, err := pokeapi.GetPokemonsForLA(secondInput)
@@ -238,5 +254,57 @@ func commandExplore(config *Config) error {
 	}
 
 	return nil
+}
 
+func commandCatch(config *Config) error {
+	secondInput := config.AddtionalArguments
+	if secondInput == "" {
+		fmt.Printf("Please provide a pokemon name\n")
+		return nil
+	}
+
+	isPokeCaught, res, err := pokeapi.CatchPokemon(secondInput)
+	if err != nil {
+		fmt.Printf("Error with api pokemon: %v\n", err)
+	}
+
+	fmt.Printf("Throwing a Pokeball at %v...\n", secondInput)
+	if isPokeCaught {
+		fmt.Printf("%v was caught!\n", res.Name)
+		config.Pokedex[res.Name] = res
+	} else {
+		fmt.Printf("%v escaped!\n", res.Name)
+	}
+
+	return nil
+}
+
+func commandInspect(config *Config) error {
+	secondInput := config.AddtionalArguments
+	if secondInput == "" {
+		fmt.Printf("Please provide a pokemon name\n")
+		return nil
+	}
+	var res pokeapi.Pokemon
+	pokeInMap, ok := config.Pokedex[secondInput]
+	if ok {
+		res = pokeInMap
+	} else {
+		poke, err := pokeapi.GetPokemon(secondInput)
+		if err != nil {
+			fmt.Printf("Error with api pokemon: %v\n", err)
+		}
+		res = poke
+	}
+
+	fmt.Printf("Name: %s\nHeight: %v\nWeight: %v\n", res.Name, res.Height, res.Weight)
+	fmt.Println("Stats:")
+	for _, s := range res.Stats {
+		fmt.Printf("  - %v: %v\n", s.Stat.Name, s.BaseStat)
+	}
+	fmt.Println("Types:")
+	for _, t := range res.Types {
+		fmt.Printf("  - %v\n", t.Type.Name)
+	}
+	return nil
 }
